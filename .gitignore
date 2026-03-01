@@ -81,3 +81,5 @@ qdrant_storage/
 
 # Local data files
 *.jsonl
+Backend/Backend.csproj
+Backend/Properties/launchSettings.json
