@@ -83,3 +83,8 @@ qdrant_storage/
 *.jsonl
 Backend/Backend.csproj
 Backend/Properties/launchSettings.json
+UniHelper/UniHelper.sln
+UniHelper/.idea/.idea.UniHelper/.idea/encodings.xml
+UniHelper/.idea/.idea.UniHelper/.idea/indexLayout.xml
+UniHelper/.idea/.idea.UniHelper/.idea/vcs.xml
+UniHelper/UniHelper/UniHelper.csproj
