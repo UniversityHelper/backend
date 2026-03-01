@@ -52,3 +52,32 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+
+# IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build
+bin/
+obj/
+
+# Logs
+logs/
+*.log
+
+# Local DB / vector storage
+qdrant_storage/
+*.db
+*.sqlite
+
+# Local data files
+*.jsonl
