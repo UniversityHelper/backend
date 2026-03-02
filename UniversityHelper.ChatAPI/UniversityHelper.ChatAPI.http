@@ -1,0 +1,6 @@
+@UniversityHelper.ChatAPI_HostAddress = http://localhost:5171
+
+GET {{UniversityHelper.ChatAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

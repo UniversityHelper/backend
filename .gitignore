@@ -1,0 +1,35 @@
+# Build results
+bin/
+obj/
+out/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+!**/packages/build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+build_out.txt
+run_output.txt
+diag.log
+
+# Env / secrets
+.env
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
