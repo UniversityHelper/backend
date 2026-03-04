@@ -73,18 +73,14 @@ obj/
 # Logs
 logs/
 *.log
+build_out.txt
+run_output.txt
+diag.log
 
-# Local DB / vector storage
-qdrant_storage/
-*.db
-*.sqlite
+# Env / secrets
+.env
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
 
-# Local data files
-*.jsonl
-Backend/Backend.csproj
-Backend/Properties/launchSettings.json
-UniHelper/UniHelper.sln
-UniHelper/.idea/.idea.UniHelper/.idea/encodings.xml
-UniHelper/.idea/.idea.UniHelper/.idea/indexLayout.xml
-UniHelper/.idea/.idea.UniHelper/.idea/vcs.xml
-UniHelper/UniHelper/UniHelper.csproj
+UniHelper/UniHelper/appsettings.json

@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Update="Resources\*.jsonl">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.FileExtensions" Version="8.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="appsettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+</Project>
