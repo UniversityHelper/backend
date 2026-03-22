@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using UniHelper.Qdrant;
 
 namespace UniHelper;
@@ -25,9 +27,23 @@ public static class Program
         
         if (args.Length == 0)
         {
-            Console.WriteLine("Commands:");
-            Console.WriteLine("ingest <path_to_jsonl>");
-            Console.WriteLine("ask \"<question>\"");
+            var builder = WebApplication.CreateBuilder(args);
+            builder.Services.AddControllers();
+            builder.Services.AddCors(options =>
+            {
+                options.AddDefaultPolicy(policy =>
+                {
+                    policy.AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                });
+            });
+            
+            var app = builder.Build();
+            app.UseCors();
+            app.MapControllers();
+            await app.RunAsync();
+            
             return;
         }
 
