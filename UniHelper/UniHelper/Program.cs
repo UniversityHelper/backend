@@ -18,10 +18,10 @@ public static class Program
         var qdrantUrl = config["Qdrant:Url"]!;
         var qdrantKey = config["Qdrant:ApiKey"]!;
         var collection = config["Qdrant:Collection"]!;
-        var openAiKey = config["OpenAi:ApiKey"]!;
-        var chatModel = config["OpenAIChat:ChatModel"]!;
-        var openAiEmbeddingModel = config["OpenAi:EmbeddingModel"]!;
-        var embedder = new OpenAiEmbeddingClient(openAiKey, openAiEmbeddingModel);
+        var openAiKey = config["OpenAI:ApiKey"]!;
+        var embeddingModel = config["OpenAI:EmbeddingModel"]!;
+        var chatModel = config["OpenAI:ChatModel"]!;
+        var embedder = new OpenAiEmbeddingClient(openAiKey, embeddingModel);
         var qdrant = new QdrantClient(qdrantUrl, qdrantKey, collection);
         var llm = new OpenAiChatClient(openAiKey, chatModel);
         

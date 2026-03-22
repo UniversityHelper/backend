@@ -9,13 +9,10 @@ public class OpenAiChatClient
     private readonly HttpClient HttpClient;
     private readonly string Model;
 
-    public OpenAiChatClient(string apiKey, string baseUrl, string model = "gpt-4o-mini", HttpClient? httpClient = null)
+    public OpenAiChatClient(string apiKey, string model = "gpt-4o-mini", HttpClient? httpClient = null)
     {
         if (string.IsNullOrWhiteSpace(apiKey))
-            throw new ArgumentException("DeepSeek ApiKey is empty. Check appsettings.json: DeepSeek:ApiKey");
-
-        if (string.IsNullOrWhiteSpace(baseUrl))
-            throw new ArgumentException("DeepSeek BaseUrl is empty. Check appsettings.json: DeepSeek:BaseUrl");
+            throw new ArgumentException("OpenAI ApiKey is empty. Check appsettings.json: OpenAI:ApiKey");
 
         HttpClient = httpClient ?? new HttpClient();
         HttpClient.BaseAddress = new Uri("https://api.openai.com");
