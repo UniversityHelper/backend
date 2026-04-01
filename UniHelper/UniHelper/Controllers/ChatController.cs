@@ -13,7 +13,6 @@ public class ChatResponse
 {
     public string Answer { get; set; } = "";
     public bool Found { get; set; }
-    public List<ChatSource> Sources { get; set; } = [];
 }
 
 public class ChatSource
@@ -87,7 +86,6 @@ public class ChatController(IConfiguration configuration) : ControllerBase
             {
                 Answer = "Не найдено в официальных источниках УрФУ.",
                 Found = false,
-                Sources = new List<ChatSource>()
             });
         }
         
@@ -95,8 +93,7 @@ public class ChatController(IConfiguration configuration) : ControllerBase
                                     "Отвечай только по переданному CONTEXT. " + 
                                     "Если в контексте нет ответа, скажи: " + 
                                     "\"Не найдено в официальных источниках УрФУ.\" " + 
-                                    "Не придумывай факты, даты и числа. " + 
-                                    "В конце коротко укажи источники.";
+                                    "Не придумывай факты, даты и числа. ";
         var userPrompt = $"QUESTION:\n{request.Message}\n\n" + $"CONTEXT:\n{string.Join("\n\n", contextParts)}";
         var answer = await llm.ChatAsync(systemPrompt, userPrompt);
         var resultSources = new List<ChatSource>();
@@ -114,7 +111,6 @@ public class ChatController(IConfiguration configuration) : ControllerBase
         {
             Answer = answer,
             Found = true,
-            Sources = resultSources
         });
     }
 }
