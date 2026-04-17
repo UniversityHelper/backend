@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Net;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 
@@ -45,9 +46,23 @@ public class ChatController(IConfiguration configuration) : ControllerBase
         var openAiKey = configuration["OpenAI:ApiKey"]!;
         var embeddingModel = configuration["OpenAI:EmbeddingModel"]!;
         var chatModel = configuration["OpenAI:ChatModel"]!;
-        var embedder = new OpenAiEmbeddingClient(openAiKey, embeddingModel);
+        var proxyUrl = configuration["Proxy:ProxyUrl"]!;
+        var login = configuration["Proxy:Login"]!;
+        var password = configuration["Proxy:Password"]!;
+
+        var webProxy = new WebProxy(proxyUrl)
+        {
+            Credentials = new NetworkCredential(login, password)
+        };
+        
+        using var handler = new HttpClientHandler();
+        handler.Proxy = webProxy;
+        handler.UseProxy = true;
+
+        using var httpClient = new HttpClient(handler);
+        var embedder = new OpenAiEmbeddingClient(openAiKey, embeddingModel, httpClient);
         var qdrant = new QdrantClient(qdrantUrl, qdrantKey, collection);
-        var llm = new OpenAiChatClient(openAiKey, chatModel);
+        var llm = new OpenAiChatClient(openAiKey, chatModel, httpClient);
         var queryVector = await embedder.EmbeddingAsync(request.Message);
         var hits = await qdrant.SearchAsync(queryVector, limit: 5);
         var contextParts = new List<string>();

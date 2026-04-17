@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using System.Net;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using UniHelper.Qdrant;
@@ -21,9 +22,24 @@ public static class Program
         var openAiKey = config["OpenAI:ApiKey"]!;
         var embeddingModel = config["OpenAI:EmbeddingModel"]!;
         var chatModel = config["OpenAI:ChatModel"]!;
-        var embedder = new OpenAiEmbeddingClient(openAiKey, embeddingModel);
+        var proxyUrl = config["Proxy:ProxyUrl"]!;
+        var login = config["Proxy:Login"]!;
+        var password = config["Proxy:Password"]!;
+        
+        var webProxy = new WebProxy(proxyUrl)
+        {
+            Credentials = new NetworkCredential(login, password)
+        };
+        var handler = new HttpClientHandler
+        {
+            Proxy = webProxy,
+            UseProxy = true
+        };
+        
+        var httpClient = new HttpClient(handler);
+        var embedder = new OpenAiEmbeddingClient(openAiKey, embeddingModel, httpClient);
         var qdrant = new QdrantClient(qdrantUrl, qdrantKey, collection);
-        var llm = new OpenAiChatClient(openAiKey, chatModel);
+        var llm = new OpenAiChatClient(openAiKey, chatModel, httpClient);
         
         if (args.Length == 0)
         {
