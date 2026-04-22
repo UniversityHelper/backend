@@ -8,6 +8,7 @@ namespace UniHelper.Controllers;
 public class ChatRequest
 {
     public string Message { get; set; } = "";
+    public string SessionId { get; set; } = "";
 }
 
 public class ChatResponse
@@ -16,18 +17,10 @@ public class ChatResponse
     public bool Found { get; set; }
 }
 
-public class ChatSource
-{
-    public string Title { get; set; } = "";
-    public string Url { get; set; } = "";
-}
-
 [ApiController]
 [Route("api/chat")]
 public class ChatController(IConfiguration configuration) : ControllerBase
 {
-    private readonly IConfiguration configuration = configuration;
-
     [HttpGet("health")]
     public IActionResult Health()
     {
@@ -73,6 +66,8 @@ public class ChatController(IConfiguration configuration) : ControllerBase
         {
             const string chitchat = "Ты дружелюбный ассистент УрФУ. Поздоровайся и спроси, чем помочь. Отвечай кратко и вежливо.";
             var chatAnswer = await llm.ChatAsync(chitchat, request.Message);
+            
+            AnalyticsController.RecordChatInteraction(request.SessionId, true);
 
             return Ok(new ChatResponse
             {
@@ -123,11 +118,14 @@ public class ChatController(IConfiguration configuration) : ControllerBase
                                     """;
         var userPrompt = $"QUESTION:\n{request.Message}\n\n" + $"CONTEXT:\n{string.Join("\n\n", contextParts)}";
         var answer = await llm.ChatAsync(systemPrompt, userPrompt);
+        var isFound = !answer.Contains("К сожалению, я не нашел");
+        
+        AnalyticsController.RecordChatInteraction(request.SessionId, isFound);
 
         return Ok(new ChatResponse
         {
             Answer = answer,
-            Found = contextParts.Count > 0
+            Found = isFound
         });
     }
 }
