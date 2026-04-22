@@ -63,7 +63,25 @@ public class ChatController(IConfiguration configuration) : ControllerBase
         var embedder = new OpenAiEmbeddingClient(openAiKey, embeddingModel, httpClient);
         var qdrant = new QdrantClient(qdrantUrl, qdrantKey, collection);
         var llm = new OpenAiChatClient(openAiKey, chatModel, httpClient);
-        var queryVector = await embedder.EmbeddingAsync(request.Message);
+        const string rewritePrompt = "Ты - AI, который превращает неточные вопросы пользователей в идеальные поисковые запросы для векторной базы данных университета. " +
+                                     "Исправляй опечатки, раскрывай аббревиатуры (УрФУ -> Уральский федеральный университет) и делай запрос формальным. " +
+                                     "Если это просто приветствие (привет, как дела) или бессмыслица, верни ровно одно слово: 'CHITCHAT'. " +
+                                     "Выводи ТОЛЬКО переписанный запрос без кавычек и лишних слов.";
+        var optimizedQuery = await llm.ChatAsync(rewritePrompt, request.Message);
+
+        if (optimizedQuery.Contains("CHITCHAT", StringComparison.OrdinalIgnoreCase))
+        {
+            const string chitchat = "Ты дружелюбный ассистент УрФУ. Поздоровайся и спроси, чем помочь. Отвечай кратко и вежливо.";
+            var chatAnswer = await llm.ChatAsync(chitchat, request.Message);
+
+            return Ok(new ChatResponse
+            {
+                Answer = chatAnswer,
+                Found = true
+            });
+        }
+        
+        var queryVector = await embedder.EmbeddingAsync(optimizedQuery);
         var hits = await qdrant.SearchAsync(queryVector, limit: 5);
         var contextParts = new List<string>();
         var sources = new List<object>();
@@ -94,38 +112,22 @@ public class ChatController(IConfiguration configuration) : ControllerBase
                 i++;
             }
         }
-
-        if (contextParts.Count == 0)
-        {
-            return Ok(new ChatResponse
-            {
-                Answer = "Не найдено в официальных источниках УрФУ.",
-                Found = false,
-            });
-        }
         
-        const string systemPrompt = "Ты AI-помощник по поступлению в университет. " + 
-                                    "Отвечай только по переданному CONTEXT. " + 
-                                    "Если в контексте нет ответа, скажи: " + 
-                                    "\"Не найдено в официальных источниках УрФУ.\" " + 
-                                    "Не придумывай факты, даты и числа. ";
+        const string systemPrompt = """
+                                    Ты - дружелюбный ИИ-помощник Уральского федерального университета (УрФУ). 
+                                    Твоя задача - помогать абитуриентам и студентам.
+                                    ПРАВИЛА (В ПОРЯДКЕ ПРИОРИТЕТА):
+                                    1. УТОЧНЕНИЯ: если запрос пользователя слишком короткий (1-2 слова, например, 'УрФУ') или слишком общий (например, 'расскажи про урфу'), НЕ пытайся угадать ответ. Вежливо попроси уточнить детали (например: "Что именно вас интересует об УрФУ? Направления подготовки, проходные баллы, общежития?"). НЕ здоровайся.
+                                    2. ФАКТОЛОГИЯ (СТРОГО!): если вопрос конкретный, отвечай ТОЛЬКО на основе предоставленного CONTEXT.
+                                    3. ОТСУТСТВИЕ ДАННЫХ: если запрос конкретный, но в CONTEXT нет информации, честно скажи: 'К сожалению, я не нашел этой информации в официальных источниках УрФУ.' Не придумывай от себя.
+                                    """;
         var userPrompt = $"QUESTION:\n{request.Message}\n\n" + $"CONTEXT:\n{string.Join("\n\n", contextParts)}";
         var answer = await llm.ChatAsync(systemPrompt, userPrompt);
-        var resultSources = new List<ChatSource>();
-
-        foreach (var source in sources)
-        {
-            var json = JsonSerializer.Serialize(source);
-            var parsed = JsonSerializer.Deserialize<ChatSource>(json);
-            
-            if (parsed != null)
-                resultSources.Add(parsed);
-        }
 
         return Ok(new ChatResponse
         {
             Answer = answer,
-            Found = true,
+            Found = contextParts.Count > 0
         });
     }
 }

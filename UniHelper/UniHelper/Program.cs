@@ -78,34 +78,6 @@ public static class Program
             Console.WriteLine("Ingestion completed");
             return;
         }
-
-        if (args[0].Equals("ask", StringComparison.OrdinalIgnoreCase))
-        {
-            var question = args.Length >= 2 ? string.Join(' ', args.Skip(1)) : throw new ArgumentException("Missing question");
-            var questionVector = await embedder.EmbeddingAsync(question);
-            var hits = await qdrant.SearchAsync(questionVector, limit: 8);
-            var contextLines = new List<string>();
-            var i = 1;
-
-            foreach (var hit in hits.EnumerateArray())
-            {
-                var payload = hit.GetProperty("payload");
-                var text = payload.GetProperty("text").GetString() ?? "";
-                var url = payload.TryGetProperty("url", out var urlObject) ? urlObject.GetString() ?? "" : "";
-                
-                contextLines.Add($"[{i}] url={url}\n{text}");
-                i++;
-            }
-            
-            const string system = "Отвечай только по CONTEXT. Всегда добавляй источники (url). " +
-                                  "Если в CONTEXT нет ответа, скажи: \"Не найдено в официальных источниках УрФУ\". " +
-                                  "Не придумывай числа и даты.";
-            var user = $"QUESTION: {question}\n\nCONTEXT:\n{string.Join("\n\n", contextLines)}";
-            var answer = await llm.ChatAsync(system, user);
-            
-            Console.WriteLine(answer);
-            return;
-        }
         
         Console.WriteLine("Unknown command");
     }
