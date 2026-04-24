@@ -1,7 +1,4 @@
-﻿using System.Net;
-using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.AspNetCore.Mvc;
 
 namespace UniHelper.Controllers;
 
@@ -19,7 +16,7 @@ public class ChatResponse
 
 [ApiController]
 [Route("api/chat")]
-public class ChatController(IConfiguration configuration) : ControllerBase
+public class ChatController(OpenAiChatClient llm, OpenAiEmbeddingClient embedder, QdrantClient qdrant) : ControllerBase
 {
     [HttpGet("health")]
     public IActionResult Health()
@@ -32,30 +29,7 @@ public class ChatController(IConfiguration configuration) : ControllerBase
     {
         if (request == null || string.IsNullOrEmpty(request.Message))
             return BadRequest(new { error = "Message is empty" });
-        
-        var qdrantUrl = configuration["Qdrant:Url"]!;
-        var qdrantKey = configuration["Qdrant:ApiKey"]!;
-        var collection = configuration["Qdrant:Collection"]!;
-        var openAiKey = configuration["OpenAI:ApiKey"]!;
-        var embeddingModel = configuration["OpenAI:EmbeddingModel"]!;
-        var chatModel = configuration["OpenAI:ChatModel"]!;
-        var proxyUrl = configuration["Proxy:ProxyUrl"]!;
-        var login = configuration["Proxy:Login"]!;
-        var password = configuration["Proxy:Password"]!;
 
-        var webProxy = new WebProxy(proxyUrl)
-        {
-            Credentials = new NetworkCredential(login, password)
-        };
-        
-        using var handler = new HttpClientHandler();
-        handler.Proxy = webProxy;
-        handler.UseProxy = true;
-
-        using var httpClient = new HttpClient(handler);
-        var embedder = new OpenAiEmbeddingClient(openAiKey, embeddingModel, httpClient);
-        var qdrant = new QdrantClient(qdrantUrl, qdrantKey, collection);
-        var llm = new OpenAiChatClient(openAiKey, chatModel, httpClient);
         const string rewritePrompt = "Ты - AI, который превращает неточные вопросы пользователей в идеальные поисковые запросы для векторной базы данных университета. " +
                                      "Исправляй опечатки, раскрывай аббревиатуры (УрФУ -> Уральский федеральный университет) и делай запрос формальным. " +
                                      "Если это просто приветствие (привет, как дела) или бессмыслица, верни ровно одно слово: 'CHITCHAT'. " +

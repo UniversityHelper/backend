@@ -39,7 +39,6 @@ public static class Program
         var httpClient = new HttpClient(handler);
         var embedder = new OpenAiEmbeddingClient(openAiKey, embeddingModel, httpClient);
         var qdrant = new QdrantClient(qdrantUrl, qdrantKey, collection);
-        var llm = new OpenAiChatClient(openAiKey, chatModel, httpClient);
         
         if (args.Length == 0)
         {
@@ -54,6 +53,29 @@ public static class Program
                         .AllowAnyMethod();
                 });
             });
+
+            builder.Services.AddHttpClient("OpenAI", _ => {}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                Proxy = new WebProxy(proxyUrl)
+                {
+                    Credentials = new NetworkCredential(login, password)
+                }, 
+                UseProxy = true
+            });
+
+            builder.Services.AddSingleton<OpenAiEmbeddingClient>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("OpenAI");
+                return new OpenAiEmbeddingClient(openAiKey, embeddingModel, httpClient);
+            });
+            
+            builder.Services.AddSingleton<OpenAiChatClient>(sp =>
+            {
+                var httpClient = sp.GetRequiredService<IHttpClientFactory>().CreateClient("OpenAI");
+                return new OpenAiChatClient(openAiKey, chatModel, httpClient);
+            });
+            
+            builder.Services.AddSingleton<QdrantClient>(sp => new QdrantClient(qdrantUrl, qdrantKey, collection));
             
             var app = builder.Build();
             app.UseCors();

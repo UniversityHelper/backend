@@ -8,18 +8,21 @@ public class OpenAiEmbeddingClient
 {
     private readonly HttpClient HttpClient;
     private readonly string Model;
+    private readonly string ApiKey;
 
     public OpenAiEmbeddingClient(string apiKey, string model = "text-embedding-3-large", HttpClient? httpClient = null)
     {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new ArgumentException("OpenAI ApiKey for embedding model is empty. Check appsettings.json: OpenAI:ApiKey");
+        
         HttpClient = httpClient ?? new HttpClient();
-        HttpClient.BaseAddress = new Uri("https://api.openai.com");
-        HttpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        ApiKey = apiKey;
         Model = model;
     }
 
     public async Task<float[]> EmbeddingAsync(string text, CancellationToken cancellationToken = default)
     {
-        var vectors = await EmbeddingBatchAsync(new[] { text }, cancellationToken);
+        var vectors = await EmbeddingBatchAsync([text], cancellationToken);
         return vectors[0];
     }
 
@@ -36,7 +39,11 @@ public class OpenAiEmbeddingClient
             input = texts,
         };
         var json = JsonSerializer.Serialize(body);
-        using var response = await HttpClient.PostAsync("/v1/embeddings", new StringContent(json, Encoding.UTF8, "application/json"), cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/embeddings");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
+        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        
+        using var response = await HttpClient.SendAsync(request, cancellationToken);
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
         
         response.EnsureSuccessStatusCode();
