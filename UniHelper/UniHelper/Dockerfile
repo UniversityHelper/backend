@@ -5,8 +5,8 @@ WORKDIR /app
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["UniHelper/UniHelper.csproj", "UniHelper/"]
-RUN dotnet restore "UniHelper/UniHelper.csproj"
+COPY ["UniHelper.csproj", "UniHelper/"]
+RUN dotnet restore "UniHelper.csproj"
 COPY . .
 WORKDIR "/src/UniHelper"
 RUN dotnet build "./UniHelper.csproj" -c $BUILD_CONFIGURATION -o /app/build
