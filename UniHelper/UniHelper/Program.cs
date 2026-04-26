@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using UniHelper.Qdrant;
@@ -77,6 +78,8 @@ public static class Program
             
             builder.Services.AddSingleton<QdrantClient>(sp => new QdrantClient(qdrantUrl, qdrantKey, collection));
             
+            builder.WebHost.UseUrls("http://0.0.0.0:5000");
+
             var app = builder.Build();
             app.UseCors();
             app.MapControllers();
