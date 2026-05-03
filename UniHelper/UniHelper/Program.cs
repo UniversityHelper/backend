@@ -49,7 +49,7 @@ public static class Program
             {
                 options.AddDefaultPolicy(policy =>
                 {
-                    policy.WithOrigins("http://unihelper-backend-2xlp1d-c53fb4-81-26-177-175.traefik.me")
+                    policy.AllowAnyOrigin()
                         .AllowAnyHeader()
                         .AllowAnyMethod();
                 });
