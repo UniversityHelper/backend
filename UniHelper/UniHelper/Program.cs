@@ -47,9 +47,9 @@ public static class Program
             builder.Services.AddControllers();
             builder.Services.AddCors(options =>
             {
-                options.AddDefaultPolicy(policy =>
+                options.AddPolicy("UniHelperPolicy",policy =>
                 {
-                    policy.AllowAnyOrigin()
+                    policy.WithOrigins("https://gunihelper.space")
                         .AllowAnyHeader()
                         .AllowAnyMethod();
                 });
@@ -81,7 +81,7 @@ public static class Program
             builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
             var app = builder.Build();
-            app.UseCors();
+            app.UseCors("UniHelperPolicy");
             app.MapControllers();
             await app.RunAsync();
             
