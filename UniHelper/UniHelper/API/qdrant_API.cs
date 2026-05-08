@@ -25,7 +25,7 @@ public class QdrantClient
     public async Task CreateCollectionAsync(int vectorSize, CancellationToken cancellationToken = default)
     {
         using var getRequest = new HttpRequestMessage(HttpMethod.Get, $"{BaseUrl}/collections/{Collection}");
-        getRequest.Headers.Add("ApiKey", ApiKey);
+        getRequest.Headers.Add("api-key", ApiKey);
         using var get = await HttpClient.SendAsync(getRequest, cancellationToken);
         
         if (get.IsSuccessStatusCode)
