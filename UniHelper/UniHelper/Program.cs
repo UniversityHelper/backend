@@ -45,17 +45,17 @@ public static class Program
         {
             var builder = WebApplication.CreateBuilder(args);
             builder.Services.AddControllers();
+            
+            var myAllowSpecificOrigins = "UniHelperPolicy";
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy("UniHelperPolicy", policy =>
-                {
-                    policy.SetIsOriginAllowed(origin => 
-                            origin == null || 
-                            origin.EndsWith("gunihelper.space") || 
-                            origin.Contains("traefik.me")) 
-                        .AllowAnyHeader()
-                        .AllowAnyMethod();
-                });
+                options.AddPolicy(name: myAllowSpecificOrigins,
+                    policy =>
+                    {
+                        policy.WithOrigins("https://gunihelper.space") 
+                            .AllowAnyHeader()
+                            .AllowAnyMethod();
+                    });
             });
 
             builder.Services.AddHttpClient("OpenAI", _ => {}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
@@ -84,7 +84,8 @@ public static class Program
             builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
             var app = builder.Build();
-            app.UseCors("UniHelperPolicy");
+            app.UseRouting();
+            app.UseCors(myAllowSpecificOrigins);
             app.MapControllers();
             await app.RunAsync();
             
