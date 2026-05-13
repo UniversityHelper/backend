@@ -51,7 +51,10 @@ public class ChatController(OpenAiChatClient llm, OpenAiEmbeddingClient embedder
 
         if (optimizedQuery.Contains("CHITCHAT", StringComparison.OrdinalIgnoreCase))
         {
-            const string chitchat = "Ты дружелюбный ассистент УрФУ. Поздоровайся и спроси, чем помочь. Отвечай кратко и вежливо.";
+            const string chitchat = "Ты дружелюбный ассистент по вопросам поступления. " +
+                                    "Твоя компетенция ограничена ТОЛЬКО пятью вузами: УрФУ, МГУ, НИУ ВШЭ, ИТМО и СПбГУ. " +
+                                    "Поздоровайся и скажи, что можешь помочь с информацией именно по этим пяти вузам. " +
+                                    "Отвечай кратко и вежливо.";
             var chatAnswer = await llm.ChatAsync(chitchat, request.Message);
             
             AnalyticsController.RecordChatInteraction(request.SessionId, true);
