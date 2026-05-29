@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
 
 namespace UniHelper.Controllers;
 
@@ -36,123 +38,95 @@ public class ChatController(OpenAiChatClient llm, OpenAiEmbeddingClient embedder
     {
         if (request == null || string.IsNullOrEmpty(request.Message))
             return BadRequest(new { error = "Message is empty" });
-        
+
         var historyText = request.History is { Count: > 0 } 
-            ? "КОНТЕКСТ ПРЕДЫДУЩЕГО ДИАЛОГА:\n" + string.Join('\n', request.History.Select(history => $"{history.Role}: {history.Content}")) + "\n\n" 
+            ? "КОНТЕКСТ ДИАЛОГА:\n" + string.Join('\n', request.History.Select(h => $"{h.Role}: {h.Content}")) + "\n"
             : "";
-        var rewritePrompt = $$"""
-                              Ты - AI, который превращает неточные вопросы пользователей в идеальные поисковые запросы для векторной базы данных. 
-                              ОБЯЗАТЕЛЬНО используй КОНТЕКСТ ПРЕДЫДУЩЕГО ДИАЛОГА, чтобы понимать суть и сохранять название обсуждаемого вуза в новых запросах.
-
-                              ПРАВИЛА:
-                              1. Если это приветствие, бессмыслица ИЛИ вопрос о твоих возможностях, верни ровно одно слово: CHITCHAT
-                              2. Если пользователь ЯВНО спрашивает про СТОРОННИЙ ВУЗ (не УрФУ, МГУ, НИУ ВШЭ, ИТМО, СПбГУ) — верни ровно одно слово: OUT_OF_SCOPE
-                              3. В остальных случаях перепиши запрос: исправь опечатки, РАСКРОЙ аббревиатуры факультетов/программ и ОБЯЗАТЕЛЬНО добавь название вуза из контекста. Выведи ТОЛЬКО переписанный запрос.
-
-                              ПРИМЕРЫ:
-                              Вопрос: Какие вузы ты знаешь?
-                              Ответ: CHITCHAT
-
-                              Вопрос: Расскажи про НГУ
-                              Ответ: OUT_OF_SCOPE
-
-                              Вопрос: Есть ли фкн в ниу вшэ?
-                              Ответ: Есть ли факультет компьютерных наук в НИУ ВШЭ?
-
-                              Вопрос: Что ты знаешь о фкн в ниу вшэ?
-                              Ответ: Информация о факультете компьютерных наук в НИУ ВШЭ
-
-                              Вопрос: Что такое совбак?
-                              Ответ: Что такое совместный бакалавриат?
-
-                              Вопрос: А какой там проходной? (Контекст: ранее обсуждали НИУ ВШЭ)
-                              Ответ: Какой проходной балл в НИУ ВШЭ?
-
-                              {{historyText}}
-                              """;
-        var optimizedQuery = await llm.ChatAsync(rewritePrompt, request.Message);
-
-        if (optimizedQuery.Contains("CHITCHAT", StringComparison.OrdinalIgnoreCase))
+        var tools = new object[]
         {
-            const string chitchat = "Ты дружелюбный ассистент по вопросам поступления. " +
-                                    "Если тебя спрашивают о том, что ты умеешь или какие вузы знаешь, отвечай СТРОГО по шаблону.\n" +
-                                    "ПРАВИЛА:\n" +
-                                    "1. Твоя компетенция ограничена ТОЛЬКО пятью вузами: УрФУ, МГУ, НИУ ВШЭ, ИТМО и СПбГУ.\n" +
-                                    "2. ЗАПРЕЩЕНО писать 'и другие' или упоминать любые другие вузы.\n" +
-                                    "3. В своем ответе ОБЯЗАТЕЛЬНО перечисли все пять вузов. Никогда не пропускай ни один из них.";
-            var chatAnswer = await llm.ChatAsync(chitchat, request.Message);
-            
-            AnalyticsController.RecordChatInteraction(request.SessionId, true);
-
-            return Ok(new ChatResponse
+            new
             {
-                Answer = chatAnswer,
-                Found = true
-            });
-        }
-
-        if (optimizedQuery.Contains("OUT_OF_SCOPE", StringComparison.OrdinalIgnoreCase))
-        {
-            AnalyticsController.RecordChatInteraction(request.SessionId, false);
-            return Ok(new ChatResponse
-            {
-                Answer = "Я могу проконсультировать вас только по вопросам поступления в УрФУ, МГУ, НИУ ВШЭ, ИТМО и СПбГУ.",
-                Found = false
-            });
-        }
-        
-        var queryVector = await embedder.EmbeddingAsync(optimizedQuery);
-        var hits = await qdrant.SearchAsync(queryVector, limit: 5);
-        var contextParts = new List<string>();
-        var sources = new List<object>();
-        var i = 1;
-        
-        foreach (var hit in hits.EnumerateArray())
-        {
-            var payload = hit.GetProperty("payload");
-            var text = payload.TryGetProperty("text", out var textProperty)
-                ? textProperty.GetString() ?? ""
-                : "";
-            var url = payload.TryGetProperty("url", out var urlProperty)
-                ? urlProperty.GetString() ?? ""
-                : "";
-            var title = payload.TryGetProperty("title", out var titleProperty)
-                ? titleProperty.GetString() ?? "Источник"
-                : "Источник";
-
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                contextParts.Add($"[{i}] title={title}\nurl={url}\n{text}");
-                sources.Add(new
+                type = "function",
+                function = new
                 {
-                    title,
-                    url
-                });
-
-                i++;
+                    name = "search_university_database",
+                    description = "Поиск официальной информации о направлениях, проходных баллах, местах и условиях.",
+                    parameters = new
+                    {
+                        type = "object",
+                        properties = new
+                        {
+                            searchQuery = new
+                            {
+                                type = "string",
+                                description =
+                                    "Точный поисковый запрос. ОБЯЗАТЕЛЬНО переводи аббревиатуры в верхний регистр или раскрывай их (например: 'фиит' -> 'ФИИТ' или 'Фундаментальная информатика')"
+                            },
+                            university = new
+                            {
+                                type = "string",
+                                description =
+                                    "Строго одно из значений если упомянуто: 'НИУ ВШЭ', 'МГУ', 'УрФУ', 'ИТМО', 'СПбГУ'"
+                            },
+                            level = new
+                            {
+                                type = "string",
+                                description = "Уровень образования если упомянут: 'бакалавриат' или 'магистратура'"
+                            }
+                        },
+                        required = new[] { "searchQuery" }
+                    }
+                }
             }
-        }
+        };
         
-        const string systemPrompt = """
-                                    Ты - дружелюбный ИИ-помощник, твоя зона компетенции СТРОГО ОГРАНИЧЕНА пятью вузами: УрФУ, МГУ, НИУ ВШЭ, ИТМО и СПбГУ.
+        const string librarianPrompt = """
+                                       Ты - библиотекарь-навигатор приемной комиссии. Твоя задача - извлечь параметры вопроса и найти информацию с помощью инструмента.
+                                       ПРАВИЛА:
+                                       1. ПАМЯТЬ: обязательно используй КОНТЕКСТ ДИАЛОГА. Если пользователь пишет "а какой там проходной?", пойми из контекста, о каком вузе и направлении идет речь.
+                                       2. АББРЕВИАТУРЫ: распознавай аббревиатуры даже в нижнем регистре (фиит -> ФИИТ, пми -> ПМИ) и используй их в поиске.
+                                       Твой поиск ограничен 5 вузами: МГУ, НИУ ВШЭ, УрФУ, ИТМО, СПбГУ.
+                                       """;
+        var librarianUserMessage = $"{historyText}QUESTION:\n{request.Message}";
+        var messageResponse = await llm.ChatWithToolsAsync(librarianPrompt, librarianUserMessage, tools);
+        List<string> contextParts = [];
 
-                                    ПРАВИЛА (В ПОРЯДКЕ ПРИОРИТЕТА):
-                                    1. ГРАНИЦЫ ЗНАНИЙ (ОЧЕНЬ ВАЖНО!): если пользователь спрашивает про любой другой вуз (например, НГУ, МФТИ, КФУ и т.д.), СРАЗУ отказывайся отвечать. Отвечай строго одной фразой: 'Я могу проконсультировать вас только по вопросам поступления в УрФУ, МГУ, НИУ ВШЭ, ИТМО и СПбГУ.' Запрещено использовать внутренние знания о других вузах.
-                                    2. ОТВЕЧАЙ НА ВОПРОС: если пользователь спрашивает "Что такое ИТМО?" или "Что такое Совбак?", найди определение в CONTEXT и объясни. Не перечисляй вузы, с которыми ты работаешь, просто отвечай по сути.
-                                    3. СТРОГОЕ СООТВЕТСТВИЕ ВУЗУ: если пользователь спрашивает про конкретный вуз (например, проходной балл в НИУ ВШЭ), а в CONTEXT есть данные только про другой вуз (например, УрФУ) — ЗАПРЕЩЕНО предлагать данные другого вуза. Ничего не придумывай и не предлагай альтернативы по своей инициативе.
-                                    4. ФАКТОЛОГИЯ: отвечай ТОЛЬКО на основе предоставленного CONTEXT. 
-                                    5. ОТСУТСТВИЕ ДАННЫХ: если информации в CONTEXT нет, скажи ровно одну фразу: 'К сожалению, я не нашел этой информации в официальных документах.' И СРАЗУ ОСТАНОВИСЬ.
-                                    6. ФОРМАТИРОВАНИЕ: отвечай ТОЛЬКО простым текстом. Запрещено использовать Markdown-разметку (никаких звездочек **, решеток # или жирного шрифта).
-                                    """;
-        var userPrompt = $"{historyText}QUESTION:\n{request.Message}\n\nCONTEXT:\n{string.Join("\n\n", contextParts)}";
-        var answer = await llm.ChatAsync(systemPrompt, userPrompt);
+        if (messageResponse.TryGetProperty("tool_calls", out var toolCalls) && toolCalls.GetArrayLength() > 0)
+        {
+            var firstCall = toolCalls[0].GetProperty("function");
+            var argsJson = firstCall.GetProperty("arguments").GetString()!;
+            using var argsDoc = JsonDocument.Parse(argsJson);
+            var args = argsDoc.RootElement;
+            var searchQuery = args.GetProperty("searchQuery").GetString()!;
+            var targetUniversity = args.TryGetProperty("university", out var university) ? university.GetString() : null;
+            var targetLevel = args.TryGetProperty("level", out var level) ? level.GetString() : null;
+            var queryVector = await embedder.EmbeddingAsync(searchQuery);
+            var searchHits = await qdrant.SearchAsync(queryVector, limit: 5, university: targetUniversity, level: targetLevel);
+
+            foreach (var hit in searchHits.EnumerateArray())
+                if (hit.TryGetProperty("payload", out var payload) && payload.TryGetProperty("text", out var text))
+                    contextParts.Add(text.GetString() ?? "");
+        }
+        const string finalSystemPrompt = """
+                                         Ты - робот-помощник UniHelper. Твоя область знаний СТРОГО ограничена пятью вузами: МГУ, НИУ ВШЭ, УрФУ, ИТМО и СПбГУ.
+
+                                         ПРАВИЛА:
+                                         1. СМОЛТОК И КОМПЕТЕНЦИЯ (ВАЖНО!): 
+                                            - Если пользователь просто здоровается (привет, здравствуйте), прощается или благодарит — отвечай вежливо (например, "Здравствуйте! Чем я могу помочь?") без использования контекста.
+                                            - Если пользователь спрашивает, какие вузы ты знаешь, с какими университетами работаешь или какова твоя область знаний — четко перечисли только эти пять вузов: МГУ, НИУ ВШЭ, УрФУ, ИТМО и СПбГУ. Строго запрещено говорить "и другие" или упоминать сторонние вузы.
+                                            - При обработке приветствий и вопросов о твоих возможностях никогда не пиши про отсутствие данных в документах.
+                                         2. ОТСУТСТВИЕ ДАННЫХ: если задан конкретный вопрос по вузу/поступлению (например, про проходные баллы, направления, общежития), но в CONTEXT нет ответа, скажи ровно одну фразу: 'К сожалению, я не нашел этой информации в официальных документах.' И СРАЗУ ОСТАНОВИСЬ.
+                                         3. ФАКТОЛОГИЯ: отвечай ТОЛЬКО на основе предоставленного CONTEXT. Ничего не придумывай.
+                                         4. ФОРМАТИРОВАНИЕ: отвечай ТОЛЬКО простым текстом без Markdown разметки.
+                                         """;
+        var finalUserPrompt = $"{historyText}QUESTION:\n{request.Message}\n\nCONTEXT:\n{string.Join("\n\n", contextParts)}";
+        var answer = await llm.ChatAsync(finalSystemPrompt, finalUserPrompt);
         var isFound = !answer.Contains("К сожалению, я не нашел");
         
         AnalyticsController.RecordChatInteraction(request.SessionId, isFound);
-
         return Ok(new ChatResponse
         {
-            Answer = answer,
+            Answer = answer, 
             Found = isFound
         });
     }

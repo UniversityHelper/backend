@@ -46,4 +46,34 @@ public class OpenAiChatClient
         using var document = JsonDocument.Parse(responseJson);
         return document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
     }
+
+    public async Task<JsonElement> ChatWithToolsAsync(string system, string user, object[] tools,
+        CancellationToken cancellationToken = default)
+    {
+        var body = new
+        {
+            model = Model,
+            messages = new object[]
+            {
+                new { role = "system", content = system },
+                new { role = "user", content = user },
+            },
+            tools,
+            tool_choice = "auto",
+            temperature = 0
+        };
+        
+        var json = JsonSerializer.Serialize(body);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
+        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        
+        using var response = await HttpClient.SendAsync(request, cancellationToken);
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        
+        response.EnsureSuccessStatusCode();
+        
+        using var document = JsonDocument.Parse(responseJson);
+        return document.RootElement.GetProperty("choices")[0].GetProperty("message").Clone();
+    }
 }
