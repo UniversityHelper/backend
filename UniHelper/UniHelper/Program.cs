@@ -52,7 +52,7 @@ public static class Program
                 options.AddPolicy(name: myAllowSpecificOrigins,
                     policy =>
                     {
-                        policy.WithOrigins("https://gunihelper.space") 
+                        policy.WithOrigins("https://gunihelper.space", "http://localhost:63343") 
                             .AllowAnyHeader()
                             .AllowAnyMethod();
                     });
@@ -79,8 +79,7 @@ public static class Program
                 return new OpenAiChatClient(openAiKey, chatModel, httpClient);
             });
             
-            builder.Services.AddSingleton<QdrantClient>(sp => new QdrantClient(qdrantUrl, qdrantKey, collection));
-            
+            builder.Services.AddSingleton<QdrantClient>(_ => new QdrantClient(qdrantUrl, qdrantKey, collection));
             builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
             var app = builder.Build();
